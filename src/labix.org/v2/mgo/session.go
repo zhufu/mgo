@@ -43,6 +43,10 @@ import (
 	"time"
 )
 
+import (
+	"labix.org/v2/imgo"
+)
+
 type mode int
 
 const (
@@ -1587,7 +1591,7 @@ func (s *Session) FsyncUnlock() error {
 //     http://www.mongodb.org/display/DOCS/Querying
 //     http://www.mongodb.org/display/DOCS/Advanced+Queries
 //
-func (c *Collection) Find(query interface{}) *Query {
+func (c *Collection) Find(query interface{}) imgo.Query {
 	session := c.Database.Session
 	session.m.RLock()
 	q := &Query{session: session, query: session.queryConfig}
@@ -1602,7 +1606,7 @@ func (c *Collection) Find(query interface{}) *Query {
 //     query := collection.Find(bson.M{"_id": id})
 //
 // See the Find method for more details.
-func (c *Collection) FindId(id interface{}) *Query {
+func (c *Collection) FindId(id interface{}) imgo.Query {
 	return c.Find(bson.D{{"_id", id}})
 }
 
@@ -1945,7 +1949,7 @@ func (c *Collection) Create(info *CollectionInfo) error {
 // The default batch size is defined by the database itself.  As of this
 // writing, MongoDB will use an initial size of min(100 docs, 4MB) on the
 // first batch, and 4MB on remaining ones.
-func (q *Query) Batch(n int) *Query {
+func (q *Query) Batch(n int) imgo.Query {
 	if n == 1 {
 		// Server interprets 1 as -1 and closes the cursor (!?)
 		n = 2
@@ -1967,7 +1971,7 @@ func (q *Query) Batch(n int) *Query {
 // a per-session basis as well, using the SetPrefetch method of Session.
 //
 // The default prefetch value is 0.25.
-func (q *Query) Prefetch(p float64) *Query {
+func (q *Query) Prefetch(p float64) imgo.Query {
 	q.m.Lock()
 	q.prefetch = p
 	q.m.Unlock()
@@ -1977,7 +1981,7 @@ func (q *Query) Prefetch(p float64) *Query {
 // Skip skips over the n initial documents from the query results.  Note that
 // this only makes sense with capped collections where documents are naturally
 // ordered by insertion time, or with sorted results.
-func (q *Query) Skip(n int) *Query {
+func (q *Query) Skip(n int) imgo.Query {
 	q.m.Lock()
 	q.op.skip = int32(n)
 	q.m.Unlock()
@@ -1987,7 +1991,7 @@ func (q *Query) Skip(n int) *Query {
 // Limit restricts the maximum number of documents retrieved to n, and also
 // changes the batch size to the same value.  Once n documents have been
 // returned by Next, the following call will return ErrNotFound.
-func (q *Query) Limit(n int) *Query {
+func (q *Query) Limit(n int) imgo.Query {
 	q.m.Lock()
 	switch {
 	case n == 1:
@@ -2016,7 +2020,7 @@ func (q *Query) Limit(n int) *Query {
 //
 //     http://www.mongodb.org/display/DOCS/Retrieving+a+Subset+of+Fields
 //
-func (q *Query) Select(selector interface{}) *Query {
+func (q *Query) Select(selector interface{}) imgo.Query {
 	q.m.Lock()
 	q.op.selector = selector
 	q.m.Unlock()
@@ -2037,7 +2041,7 @@ func (q *Query) Select(selector interface{}) *Query {
 //
 //     http://www.mongodb.org/display/DOCS/Sorting+and+Natural+Order
 //
-func (q *Query) Sort(fields ...string) *Query {
+func (q *Query) Sort(fields ...string) imgo.Query {
 	// TODO //     query4 := collection.Find(nil).Sort("score:{$meta:textScore}")
 	q.m.Lock()
 	var order bson.D
@@ -2282,7 +2286,7 @@ type DBRef struct {
 //
 //     http://www.mongodb.org/display/DOCS/Database+References
 //
-func (db *Database) FindRef(ref *DBRef) *Query {
+func (db *Database) FindRef(ref *DBRef) imgo.Query {
 	var c *Collection
 	if ref.Database == "" {
 		c = db.C(ref.Collection)
@@ -2302,7 +2306,7 @@ func (db *Database) FindRef(ref *DBRef) *Query {
 //
 //     http://www.mongodb.org/display/DOCS/Database+References
 //
-func (s *Session) FindRef(ref *DBRef) *Query {
+func (s *Session) FindRef(ref *DBRef) imgo.Query {
 	if ref.Database == "" {
 		panic(errors.New(fmt.Sprintf("Can't resolve database for %#v", ref)))
 	}
@@ -2354,7 +2358,7 @@ func (s *Session) DatabaseNames() (names []string, err error) {
 // the results. Results will be returned in batches of configurable
 // size (see the Batch method) and more documents will be requested when a
 // configurable number of documents is iterated over (see the Prefetch method).
-func (q *Query) Iter() *Iter {
+func (q *Query) Iter() imgo.Iter {
 	q.m.Lock()
 	session := q.session
 	op := q.op

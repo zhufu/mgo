@@ -38,6 +38,10 @@ import (
 	"time"
 )
 
+import (
+	"labix.org/v2/imgo"
+)
+
 type GridFS struct {
 	Files  *Collection
 	Chunks *Collection
@@ -308,7 +312,7 @@ func (gfs *GridFS) OpenNext(iter *Iter, file **GridFile) bool {
 //     files := db.C("fs" + ".files")
 //     iter := files.Find(nil).Iter()
 //
-func (gfs *GridFS) Find(query interface{}) *Query {
+func (gfs *GridFS) Find(query interface{}) imgo.Query {
 	return gfs.Files.Find(query)
 }
 
