@@ -51,5 +51,5 @@ type Iter interface {
 	Timeout() bool
 	Next(result interface{}) bool
 	All(result interface{}) error
-	For(result interface{}, f func() error) (err error)
+	//For(result interface{}, f func() error) (err error)
 }

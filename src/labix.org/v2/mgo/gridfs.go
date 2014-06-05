@@ -32,7 +32,8 @@ import (
 	"errors"
 	"hash"
 	"io"
-	"labix.org/v2/mgo/bson"
+	"labix.org/v2/base/bson"
+	. "labix.org/v2/base/log"
 	"os"
 	"sync"
 	"time"
@@ -368,7 +369,7 @@ func (file *GridFile) assertMode(mode gfsFileMode) {
 // being written to.
 func (file *GridFile) SetChunkSize(bytes int) {
 	file.assertMode(gfsWriting)
-	debugf("GridFile %p: setting chunk size to %d", file, bytes)
+	Debugf("GridFile %p: setting chunk size to %d", file, bytes)
 	file.m.Lock()
 	file.doc.ChunkSize = bytes
 	file.m.Unlock()
@@ -504,7 +505,7 @@ func (file *GridFile) Close() (err error) {
 		file.rcache = nil
 	}
 	file.mode = gfsClosed
-	debugf("GridFile %p: closed", file)
+	Debugf("GridFile %p: closed", file)
 	return file.err
 }
 
@@ -522,7 +523,7 @@ func (file *GridFile) Close() (err error) {
 func (file *GridFile) Write(data []byte) (n int, err error) {
 	file.assertMode(gfsWriting)
 	file.m.Lock()
-	debugf("GridFile %p: writing %d bytes", file, len(data))
+	Debugf("GridFile %p: writing %d bytes", file, len(data))
 	defer file.m.Unlock()
 
 	if file.err != nil {
@@ -569,7 +570,7 @@ func (file *GridFile) Write(data []byte) (n int, err error) {
 func (file *GridFile) insertChunk(data []byte) {
 	n := file.chunk
 	file.chunk++
-	debugf("GridFile %p: adding to checksum: %q", file, string(data))
+	Debugf("GridFile %p: adding to checksum: %q", file, string(data))
 	file.wsum.Write(data)
 
 	for file.doc.ChunkSize*file.wpending >= 1024*1024 {
@@ -582,7 +583,7 @@ func (file *GridFile) insertChunk(data []byte) {
 
 	file.wpending++
 
-	debugf("GridFile %p: inserting chunk %d with %d bytes", file, n, len(data))
+	Debugf("GridFile %p: inserting chunk %d with %d bytes", file, n, len(data))
 
 	// We may not own the memory of data, so rather than
 	// simply copying it, we'll marshal the document ahead of time.
@@ -607,7 +608,7 @@ func (file *GridFile) insertChunk(data []byte) {
 func (file *GridFile) insertFile() {
 	hexsum := hex.EncodeToString(file.wsum.Sum(nil))
 	for file.wpending > 0 {
-		debugf("GridFile %p: waiting for %d pending chunks to insert file", file, file.wpending)
+		Debugf("GridFile %p: waiting for %d pending chunks to insert file", file, file.wpending)
 		file.c.Wait()
 	}
 	if file.err == nil {
@@ -625,7 +626,7 @@ func (file *GridFile) insertFile() {
 // an Error, if any.
 func (file *GridFile) Seek(offset int64, whence int) (pos int64, err error) {
 	file.m.Lock()
-	debugf("GridFile %p: seeking for %s (whence=%d)", file, offset, whence)
+	Debugf("GridFile %p: seeking for %s (whence=%d)", file, offset, whence)
 	defer file.m.Unlock()
 	switch whence {
 	case os.SEEK_SET:
@@ -665,7 +666,7 @@ func (file *GridFile) Seek(offset int64, whence int) (pos int64, err error) {
 func (file *GridFile) Read(b []byte) (n int, err error) {
 	file.assertMode(gfsReading)
 	file.m.Lock()
-	debugf("GridFile %p: reading at offset %d into buffer of length %d", file, file.offset, len(b))
+	Debugf("GridFile %p: reading at offset %d into buffer of length %d", file, file.offset, len(b))
 	defer file.m.Unlock()
 	if file.offset == file.doc.Length {
 		return 0, io.EOF
@@ -688,11 +689,11 @@ func (file *GridFile) getChunk() (data []byte, err error) {
 	cache := file.rcache
 	file.rcache = nil
 	if cache != nil && cache.n == file.chunk {
-		debugf("GridFile %p: Getting chunk %d from cache", file, file.chunk)
+		Debugf("GridFile %p: Getting chunk %d from cache", file, file.chunk)
 		cache.wait.Lock()
 		data, err = cache.data, cache.err
 	} else {
-		debugf("GridFile %p: Fetching chunk %d", file, file.chunk)
+		Debugf("GridFile %p: Fetching chunk %d", file, file.chunk)
 		var doc gfsChunk
 		err = file.gfs.Chunks.Find(bson.D{{"files_id", file.doc.Id}, {"n", file.chunk}}).One(&doc)
 		data = doc.Data
@@ -702,7 +703,7 @@ func (file *GridFile) getChunk() (data []byte, err error) {
 		// Read the next one in background.
 		cache = &gfsCachedChunk{n: file.chunk}
 		cache.wait.Lock()
-		debugf("GridFile %p: Scheduling chunk %d for background caching", file, file.chunk)
+		Debugf("GridFile %p: Scheduling chunk %d for background caching", file, file.chunk)
 		// Clone the session to avoid having it closed in between.
 		chunks := file.gfs.Chunks
 		session := chunks.Database.Session.Clone()
@@ -716,6 +717,6 @@ func (file *GridFile) getChunk() (data []byte, err error) {
 		}(file.doc.Id, file.chunk)
 		file.rcache = cache
 	}
-	debugf("Returning err: %#v", err)
+	Debugf("Returning err: %#v", err)
 	return
 }

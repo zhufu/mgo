@@ -28,7 +28,8 @@ package mgo
 
 import (
 	"errors"
-	"labix.org/v2/mgo/bson"
+	"labix.org/v2/base/bson"
+	. "labix.org/v2/base/log"
 	"net"
 	"sort"
 	"sync"
@@ -151,7 +152,7 @@ func (server *mongoServer) Connect(timeout time.Duration) (*mongoSocket, error) 
 	dial := server.dial
 	server.RUnlock()
 
-	logf("Establishing new connection to %s (timeout=%s)...", server.Addr, timeout)
+	Logf("Establishing new connection to %s (timeout=%s)...", server.Addr, timeout)
 	var conn net.Conn
 	var err error
 	switch {
@@ -167,10 +168,10 @@ func (server *mongoServer) Connect(timeout time.Duration) (*mongoSocket, error) 
 		panic("dialer is set, but both dial.old and dial.new are nil")
 	}
 	if err != nil {
-		logf("Connection to %s failed: %v", server.Addr, err.Error())
+		Logf("Connection to %s failed: %v", server.Addr, err.Error())
 		return nil, err
 	}
-	logf("Connection to %s established.", server.Addr)
+	Logf("Connection to %s established.", server.Addr)
 
 	stats.conn(+1, master)
 	return newSocket(server, conn, timeout), nil
@@ -186,7 +187,7 @@ func (server *mongoServer) Close() {
 	server.liveSockets = nil
 	server.unusedSockets = nil
 	server.Unlock()
-	logf("Connections to %s closing (%d live sockets).", server.Addr, len(liveSockets))
+	Logf("Connections to %s closing (%d live sockets).", server.Addr, len(liveSockets))
 	for i, s := range liveSockets {
 		s.Close()
 		liveSockets[i] = nil
@@ -284,7 +285,7 @@ func (server *mongoServer) pinger(loop bool) {
 			time.Sleep(pingDelay)
 		}
 		op := op
-		socket, _, err := server.AcquireSocket(0, 3 * pingDelay)
+		socket, _, err := server.AcquireSocket(0, 3*pingDelay)
 		if err == nil {
 			start := time.Now()
 			_, _ = socket.SimpleQuery(&op)
@@ -306,7 +307,7 @@ func (server *mongoServer) pinger(loop bool) {
 			}
 			server.pingValue = max
 			server.Unlock()
-			logf("Ping for %s is %d ms", server.Addr, max/time.Millisecond)
+			Logf("Ping for %s is %d ms", server.Addr, max/time.Millisecond)
 		} else if err == errServerClosed {
 			return
 		}
