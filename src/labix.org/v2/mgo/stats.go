@@ -27,6 +27,7 @@
 package mgo
 
 import (
+	. "labix.org/v2/base/log"
 	"sync"
 )
 
@@ -54,7 +55,7 @@ func GetStats() (snapshot Stats) {
 
 func ResetStats() {
 	statsMutex.Lock()
-	debug("Resetting stats")
+	Debug("Resetting stats")
 	old := stats
 	stats = &Stats{}
 	// These are absolute values:

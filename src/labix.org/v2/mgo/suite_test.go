@@ -32,6 +32,7 @@ import (
 	"fmt"
 	"labix.org/v2/mgo"
 	"labix.org/v2/mgo/bson"
+	. "labix.org/v2/mgo/log"
 	. "launchpad.net/gocheck"
 	"net"
 	"os/exec"
@@ -81,7 +82,7 @@ func (s *S) versionAtLeast(v ...int) bool {
 var _ = Suite(&S{})
 
 func (s *S) SetUpSuite(c *C) {
-	mgo.SetDebug(true)
+	SetDebug(true)
 	mgo.SetStats(true)
 	s.StartAll()
 
@@ -97,7 +98,7 @@ func (s *S) SetUpTest(c *C) {
 	if err != nil {
 		panic(err.Error())
 	}
-	mgo.SetLogger((*cLogger)(c))
+	SetLogger((*cLogger)(c))
 	mgo.ResetStats()
 }
 

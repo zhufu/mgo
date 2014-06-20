@@ -28,7 +28,8 @@ package mgo
 
 import (
 	"errors"
-	"labix.org/v2/mgo/bson"
+	"labix.org/v2/base/bson"
+	. "labix.org/v2/base/log"
 	"net"
 	"sync"
 	"time"
@@ -99,7 +100,7 @@ func (op *queryOp) finalQuery(socket *mongoSocket) interface{} {
 		} else {
 			op.options.Query = op.query
 		}
-		debugf("final query is %#v\n", &op.options)
+		Debugf("final query is %#v\n", &op.options)
 		return &op.options
 	}
 	return op.query
@@ -158,7 +159,7 @@ func newSocket(server *mongoServer, conn net.Conn, timeout time.Duration) *mongo
 		panic("newSocket: InitialAcquire returned error: " + err.Error())
 	}
 	stats.socketsAlive(+1)
-	debugf("Socket %p to %s: initialized", socket, socket.addr)
+	Debugf("Socket %p to %s: initialized", socket, socket.addr)
 	socket.resetNonce()
 	go socket.readLoop()
 	return socket
@@ -277,7 +278,7 @@ func (socket *mongoSocket) updateDeadline(which deadlineType) {
 	default:
 		panic("invalid parameter to updateDeadline")
 	}
-	debugf("Socket %p to %s: updated %s deadline to %s ahead (%s)", socket, socket.addr, whichstr, socket.timeout, when)
+	Debugf("Socket %p to %s: updated %s deadline to %s ahead (%s)", socket, socket.addr, whichstr, socket.timeout, when)
 }
 
 // Close terminates the socket use.
@@ -288,11 +289,11 @@ func (socket *mongoSocket) Close() {
 func (socket *mongoSocket) kill(err error, abend bool) {
 	socket.Lock()
 	if socket.dead != nil {
-		debugf("Socket %p to %s: killed again: %s (previously: %s)", socket, socket.addr, err.Error(), socket.dead.Error())
+		Debugf("Socket %p to %s: killed again: %s (previously: %s)", socket, socket.addr, err.Error(), socket.dead.Error())
 		socket.Unlock()
 		return
 	}
-	logf("Socket %p to %s: closing: %s (abend=%v)", socket, socket.addr, err.Error(), abend)
+	Logf("Socket %p to %s: closing: %s (abend=%v)", socket, socket.addr, err.Error(), abend)
 	socket.dead = err
 	socket.conn.Close()
 	stats.socketsAlive(-1)
@@ -302,7 +303,7 @@ func (socket *mongoSocket) kill(err error, abend bool) {
 	socket.server = nil
 	socket.Unlock()
 	for _, replyFunc := range replyFuncs {
-		logf("Socket %p to %s: notifying replyFunc of closed socket: %s", socket, socket.addr, err.Error())
+		Logf("Socket %p to %s: notifying replyFunc of closed socket: %s", socket, socket.addr, err.Error())
 		replyFunc(err, nil, -1, nil)
 	}
 	if abend {
@@ -347,7 +348,7 @@ func (socket *mongoSocket) Query(ops ...interface{}) (err error) {
 	requestCount := 0
 
 	for _, op := range ops {
-		debugf("Socket %p to %s: serializing op: %#v", socket, socket.addr, op)
+		Debugf("Socket %p to %s: serializing op: %#v", socket, socket.addr, op)
 		start := len(buf)
 		var replyFunc replyFunc
 		switch op := op.(type) {
@@ -357,12 +358,12 @@ func (socket *mongoSocket) Query(ops ...interface{}) (err error) {
 			buf = addInt32(buf, 0) // Reserved
 			buf = addCString(buf, op.collection)
 			buf = addInt32(buf, int32(op.flags))
-			debugf("Socket %p to %s: serializing selector document: %#v", socket, socket.addr, op.selector)
+			Debugf("Socket %p to %s: serializing selector document: %#v", socket, socket.addr, op.selector)
 			buf, err = addBSON(buf, op.selector)
 			if err != nil {
 				return err
 			}
-			debugf("Socket %p to %s: serializing update document: %#v", socket, socket.addr, op.update)
+			Debugf("Socket %p to %s: serializing update document: %#v", socket, socket.addr, op.update)
 			buf, err = addBSON(buf, op.update)
 			if err != nil {
 				return err
@@ -373,7 +374,7 @@ func (socket *mongoSocket) Query(ops ...interface{}) (err error) {
 			buf = addInt32(buf, 0) // Reserved
 			buf = addCString(buf, op.collection)
 			for _, doc := range op.documents {
-				debugf("Socket %p to %s: serializing document for insertion: %#v", socket, socket.addr, doc)
+				Debugf("Socket %p to %s: serializing document for insertion: %#v", socket, socket.addr, doc)
 				buf, err = addBSON(buf, doc)
 				if err != nil {
 					return err
@@ -411,7 +412,7 @@ func (socket *mongoSocket) Query(ops ...interface{}) (err error) {
 			buf = addInt32(buf, 0) // Reserved
 			buf = addCString(buf, op.collection)
 			buf = addInt32(buf, int32(op.flags))
-			debugf("Socket %p to %s: serializing selector document: %#v", socket, socket.addr, op.selector)
+			Debugf("Socket %p to %s: serializing selector document: %#v", socket, socket.addr, op.selector)
 			buf, err = addBSON(buf, op.selector)
 			if err != nil {
 				return err
@@ -445,7 +446,7 @@ func (socket *mongoSocket) Query(ops ...interface{}) (err error) {
 	if socket.dead != nil {
 		dead := socket.dead
 		socket.Unlock()
-		debugf("Socket %p to %s: failing query, already closed: %s", socket, socket.addr, socket.dead.Error())
+		Debugf("Socket %p to %s: failing query, already closed: %s", socket, socket.addr, socket.dead.Error())
 		// XXX This seems necessary in case the session is closed concurrently
 		// with a query being performed, but it's not yet tested:
 		for i := 0; i != requestCount; i++ {
@@ -472,7 +473,7 @@ func (socket *mongoSocket) Query(ops ...interface{}) (err error) {
 		requestId++
 	}
 
-	debugf("Socket %p to %s: sending %d op(s) (%d bytes)", socket, socket.addr, len(ops), len(buf))
+	Debugf("Socket %p to %s: sending %d op(s) (%d bytes)", socket, socket.addr, len(ops), len(buf))
 	stats.sentOps(len(ops))
 
 	socket.updateDeadline(writeDeadline)
@@ -515,7 +516,7 @@ func (socket *mongoSocket) readLoop() {
 
 		// Don't use socket.server.Addr here.  socket is not
 		// locked and socket.server may go away.
-		debugf("Socket %p to %s: got reply (%d bytes)", socket, socket.addr, totalLen)
+		Debugf("Socket %p to %s: got reply (%d bytes)", socket, socket.addr, totalLen)
 
 		_ = totalLen
 
@@ -571,10 +572,10 @@ func (socket *mongoSocket) readLoop() {
 					return
 				}
 
-				if globalDebug && globalLogger != nil {
+				if GetDebug() && GetLogger() != nil {
 					m := bson.M{}
 					if err := bson.Unmarshal(b, m); err == nil {
-						debugf("Socket %p to %s: received document: %#v", socket, socket.addr, m)
+						Debugf("Socket %p to %s: received document: %#v", socket, socket.addr, m)
 					}
 				}
 

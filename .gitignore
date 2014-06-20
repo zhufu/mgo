@@ -1,0 +1,13 @@
+pkg
+bin
+
+.tags*
+
+tags
+*.sw[op]
+
+*.pyc
+
+cscope*
+*.test
+

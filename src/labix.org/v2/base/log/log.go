@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package mgo
+package log
 
 import "fmt"
 
@@ -46,43 +46,51 @@ func SetLogger(logger log_Logger) {
 	globalLogger = logger
 }
 
+func GetLogger() log_Logger {
+	return globalLogger
+}
+
 // Enable the delivery of debug messages to the logger.  Only meaningful
 // if a logger is also set.
 func SetDebug(debug bool) {
 	globalDebug = debug
 }
 
-func log(v ...interface{}) {
+func GetDebug() bool {
+	return globalDebug
+}
+
+func Log(v ...interface{}) {
 	if globalLogger != nil {
 		globalLogger.Output(2, fmt.Sprint(v...))
 	}
 }
 
-func logln(v ...interface{}) {
+func Logln(v ...interface{}) {
 	if globalLogger != nil {
 		globalLogger.Output(2, fmt.Sprintln(v...))
 	}
 }
 
-func logf(format string, v ...interface{}) {
+func Logf(format string, v ...interface{}) {
 	if globalLogger != nil {
 		globalLogger.Output(2, fmt.Sprintf(format, v...))
 	}
 }
 
-func debug(v ...interface{}) {
+func Debug(v ...interface{}) {
 	if globalDebug && globalLogger != nil {
 		globalLogger.Output(2, fmt.Sprint(v...))
 	}
 }
 
-func debugln(v ...interface{}) {
+func Debugln(v ...interface{}) {
 	if globalDebug && globalLogger != nil {
 		globalLogger.Output(2, fmt.Sprintln(v...))
 	}
 }
 
-func debugf(format string, v ...interface{}) {
+func Debugf(format string, v ...interface{}) {
 	if globalDebug && globalLogger != nil {
 		globalLogger.Output(2, fmt.Sprintf(format, v...))
 	}
