@@ -24,19 +24,19 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package mgo_test
+package mgo
 
 import (
 	"io"
 	"labix.org/v2/base/bson"
-	"labix.org/v2/mgo"
+	//"labix.org/v2/mgo"
 	. "launchpad.net/gocheck"
 	"os"
 	"time"
 )
 
 func (s *S) TestGridFSCreate(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -107,7 +107,7 @@ func (s *S) TestGridFSCreate(c *C) {
 }
 
 func (s *S) TestGridFSFileDetails(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -183,7 +183,7 @@ func (s *S) TestGridFSFileDetails(c *C) {
 }
 
 func (s *S) TestGridFSCreateWithChunking(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -264,7 +264,7 @@ func (s *S) TestGridFSCreateWithChunking(c *C) {
 }
 
 func (s *S) TestGridFSOpenNotFound(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -272,16 +272,16 @@ func (s *S) TestGridFSOpenNotFound(c *C) {
 
 	gfs := db.GridFS("fs")
 	file, err := gfs.OpenId("non-existent")
-	c.Assert(err == mgo.ErrNotFound, Equals, true)
+	c.Assert(err == ErrNotFound, Equals, true)
 	c.Assert(file, IsNil)
 
 	file, err = gfs.Open("non-existent")
-	c.Assert(err == mgo.ErrNotFound, Equals, true)
+	c.Assert(err == ErrNotFound, Equals, true)
 	c.Assert(file, IsNil)
 }
 
 func (s *S) TestGridFSReadAll(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -318,7 +318,7 @@ func (s *S) TestGridFSReadAll(c *C) {
 }
 
 func (s *S) TestGridFSReadChunking(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -378,7 +378,7 @@ func (s *S) TestGridFSReadChunking(c *C) {
 }
 
 func (s *S) TestGridFSOpen(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -408,7 +408,7 @@ func (s *S) TestGridFSOpen(c *C) {
 }
 
 func (s *S) TestGridFSSeek(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -463,11 +463,11 @@ func (s *S) TestGridFSSeek(c *C) {
 
 	// Trivial seek forward within same chunk. Already
 	// got the data, shouldn't touch the database.
-	sent := mgo.GetStats().SentOps
+	sent := GetStats().SentOps
 	o, err = file.Seek(1, os.SEEK_CUR)
 	c.Assert(err, IsNil)
 	c.Assert(o, Equals, int64(14))
-	c.Assert(mgo.GetStats().SentOps, Equals, sent)
+	c.Assert(GetStats().SentOps, Equals, sent)
 	_, err = file.Read(b)
 	c.Assert(err, IsNil)
 	c.Assert(b, DeepEquals, []byte("opqrs"))
@@ -480,7 +480,7 @@ func (s *S) TestGridFSSeek(c *C) {
 }
 
 func (s *S) TestGridFSRemoveId(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -518,7 +518,7 @@ func (s *S) TestGridFSRemoveId(c *C) {
 }
 
 func (s *S) TestGridFSRemove(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -540,7 +540,7 @@ func (s *S) TestGridFSRemove(c *C) {
 	c.Assert(err, IsNil)
 
 	_, err = gfs.Open("myfile.txt")
-	c.Assert(err == mgo.ErrNotFound, Equals, true)
+	c.Assert(err == ErrNotFound, Equals, true)
 
 	n, err := db.C("fs.chunks").Find(nil).Count()
 	c.Assert(err, IsNil)
@@ -548,7 +548,7 @@ func (s *S) TestGridFSRemove(c *C) {
 }
 
 func (s *S) TestGridFSOpenNext(c *C) {
-	session, err := mgo.Dial("localhost:40011")
+	session, err := Dial("localhost:40011")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -566,10 +566,10 @@ func (s *S) TestGridFSOpenNext(c *C) {
 	file.Write([]byte{'2'})
 	file.Close()
 
-	var f *mgo.GridFile
+	var f *GridFile
 	var b [1]byte
 
-	iter := gfs.Find(nil).Sort("-filename").Iter()
+	iter := gfs.find(nil).sort("-filename").iter()
 
 	ok := gfs.OpenNext(iter, &f)
 	c.Assert(ok, Equals, true)
@@ -594,7 +594,7 @@ func (s *S) TestGridFSOpenNext(c *C) {
 
 	// Do it again with a more restrictive query to make sure
 	// it's actually taken into account.
-	iter = gfs.Find(bson.M{"filename": "myfile1.txt"}).Iter()
+	iter = gfs.find(bson.M{"filename": "myfile1.txt"}).iter()
 
 	ok = gfs.OpenNext(iter, &f)
 	c.Assert(ok, Equals, true)

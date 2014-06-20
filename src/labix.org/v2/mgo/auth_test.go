@@ -1,4 +1,4 @@
-// mgo - MongoDB driver for Go
+// - MongoDB driver for Go
 //
 // Copyright (c) 2010-2012 - Gustavo Niemeyer <gustavo@niemeyer.net>
 //
@@ -24,12 +24,12 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package mgo_test
+package mgo
 
 import (
 	"flag"
 	"fmt"
-	"labix.org/v2/mgo"
+	//"labix.org/v2/
 	. "launchpad.net/gocheck"
 	"net/url"
 	"sync"
@@ -39,7 +39,7 @@ import (
 func (s *S) TestAuthLoginDatabase(c *C) {
 	// Test both with a normal database and with an authenticated shard.
 	for _, addr := range []string{"localhost:40002", "localhost:40203"} {
-		session, err := mgo.Dial(addr)
+		session, err := Dial(addr)
 		c.Assert(err, IsNil)
 		defer session.Close()
 
@@ -63,7 +63,7 @@ func (s *S) TestAuthLoginDatabase(c *C) {
 func (s *S) TestAuthLoginSession(c *C) {
 	// Test both with a normal database and with an authenticated shard.
 	for _, addr := range []string{"localhost:40002", "localhost:40203"} {
-		session, err := mgo.Dial(addr)
+		session, err := Dial(addr)
 		c.Assert(err, IsNil)
 		defer session.Close()
 
@@ -71,7 +71,7 @@ func (s *S) TestAuthLoginSession(c *C) {
 		err = coll.Insert(M{"n": 1})
 		c.Assert(err, ErrorMatches, "unauthorized|need to login|not authorized .*")
 
-		cred := mgo.Credential{
+		cred := Credential{
 			Username: "root",
 			Password: "wrong",
 		}
@@ -91,7 +91,7 @@ func (s *S) TestAuthLoginSession(c *C) {
 func (s *S) TestAuthLoginLogout(c *C) {
 	// Test both with a normal database and with an authenticated shard.
 	for _, addr := range []string{"localhost:40002", "localhost:40203"} {
-		session, err := mgo.Dial(addr)
+		session, err := Dial(addr)
 		c.Assert(err, IsNil)
 		defer session.Close()
 
@@ -116,7 +116,7 @@ func (s *S) TestAuthLoginLogout(c *C) {
 }
 
 func (s *S) TestAuthLoginLogoutAll(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -140,7 +140,7 @@ func (s *S) TestAuthLoginLogoutAll(c *C) {
 }
 
 func (s *S) TestAuthUpsertUserErrors(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -150,13 +150,13 @@ func (s *S) TestAuthUpsertUserErrors(c *C) {
 
 	mydb := session.DB("mydb")
 
-	err = mydb.UpsertUser(&mgo.User{})
+	err = mydb.UpsertUser(&User{})
 	c.Assert(err, ErrorMatches, "user has no Username")
 
-	err = mydb.UpsertUser(&mgo.User{Username: "user", Password: "pass", UserSource: "source"})
+	err = mydb.UpsertUser(&User{Username: "user", Password: "pass", UserSource: "source"})
 	c.Assert(err, ErrorMatches, "user has both Password/PasswordHash and UserSource set")
 
-	err = mydb.UpsertUser(&mgo.User{Username: "user", Password: "pass", OtherDBRoles: map[string][]mgo.Role{"db": nil}})
+	err = mydb.UpsertUser(&User{Username: "user", Password: "pass", OtherDBRoles: map[string][]Role{"db": nil}})
 	c.Assert(err, ErrorMatches, "user with OtherDBRoles is only supported in admin database")
 }
 
@@ -164,7 +164,7 @@ func (s *S) TestAuthUpsertUser(c *C) {
 	if !s.versionAtLeast(2, 4) {
 		c.Skip("UpsertUser only works on 2.4+")
 	}
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -175,20 +175,20 @@ func (s *S) TestAuthUpsertUser(c *C) {
 	mydb := session.DB("mydb")
 	myotherdb := session.DB("myotherdb")
 
-	ruser := &mgo.User{
+	ruser := &User{
 		Username: "myruser",
 		Password: "mypass",
-		Roles:    []mgo.Role{mgo.RoleRead},
+		Roles:    []Role{RoleRead},
 	}
-	rwuser := &mgo.User{
+	rwuser := &User{
 		Username: "myrwuser",
 		Password: "mypass",
-		Roles:    []mgo.Role{mgo.RoleReadWrite},
+		Roles:    []Role{RoleReadWrite},
 	}
-	rwuserother := &mgo.User{
+	rwuserother := &User{
 		Username:   "myrwuser",
 		UserSource: "mydb",
-		Roles:      []mgo.Role{mgo.RoleRead},
+		Roles:      []Role{RoleRead},
 	}
 
 	err = mydb.UpsertUser(ruser)
@@ -221,7 +221,7 @@ func (s *S) TestAuthUpsertUser(c *C) {
 
 	// Reading works, though.
 	err = othercoll.Find(nil).One(nil)
-	c.Assert(err, Equals, mgo.ErrNotFound)
+	c.Assert(err, Equals, ErrNotFound)
 
 	// Can't login directly into the database using UserSource, though.
 	err = myotherdb.Login("myrwuser", "mypass")
@@ -232,7 +232,7 @@ func (s *S) TestAuthUpserUserOtherDBRoles(c *C) {
 	if !s.versionAtLeast(2, 4) {
 		c.Skip("UpsertUser only works on 2.4+")
 	}
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -240,10 +240,10 @@ func (s *S) TestAuthUpserUserOtherDBRoles(c *C) {
 	err = admindb.Login("root", "rapadura")
 	c.Assert(err, IsNil)
 
-	ruser := &mgo.User{
+	ruser := &User{
 		Username:     "myruser",
 		Password:     "mypass",
-		OtherDBRoles: map[string][]mgo.Role{"mydb": []mgo.Role{mgo.RoleRead}},
+		OtherDBRoles: map[string][]Role{"mydb": []Role{RoleRead}},
 	}
 
 	err = admindb.UpsertUser(ruser)
@@ -258,14 +258,14 @@ func (s *S) TestAuthUpserUserOtherDBRoles(c *C) {
 	c.Assert(err, ErrorMatches, "unauthorized|not authorized .*")
 
 	err = coll.Find(nil).One(nil)
-	c.Assert(err, Equals, mgo.ErrNotFound)
+	c.Assert(err, Equals, ErrNotFound)
 }
 
 func (s *S) TestAuthUpserUserUnsetFields(c *C) {
 	if !s.versionAtLeast(2, 4) {
 		c.Skip("UpsertUser only works on 2.4+")
 	}
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -274,18 +274,18 @@ func (s *S) TestAuthUpserUserUnsetFields(c *C) {
 	c.Assert(err, IsNil)
 
 	// Insert a user with most fields set.
-	user := &mgo.User{
+	user := &User{
 		Username:     "myruser",
 		Password:     "mypass",
-		Roles:        []mgo.Role{mgo.RoleRead},
-		OtherDBRoles: map[string][]mgo.Role{"mydb": []mgo.Role{mgo.RoleRead}},
+		Roles:        []Role{RoleRead},
+		OtherDBRoles: map[string][]Role{"mydb": []Role{RoleRead}},
 	}
 	err = admindb.UpsertUser(user)
 	c.Assert(err, IsNil)
 	defer admindb.RemoveUser("myruser")
 
 	// Now update the user with few things set.
-	user = &mgo.User{
+	user = &User{
 		Username:   "myruser",
 		UserSource: "mydb",
 	}
@@ -300,7 +300,7 @@ func (s *S) TestAuthUpserUserUnsetFields(c *C) {
 	c.Assert(userm, DeepEquals, M{"user": "myruser", "userSource": "mydb", "roles": []interface{}{}})
 
 	// Now set password again...
-	user = &mgo.User{
+	user = &User{
 		Username: "myruser",
 		Password: "mypass",
 	}
@@ -314,7 +314,7 @@ func (s *S) TestAuthUpserUserUnsetFields(c *C) {
 }
 
 func (s *S) TestAuthAddUser(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -345,7 +345,7 @@ func (s *S) TestAuthAddUser(c *C) {
 }
 
 func (s *S) TestAuthAddUserReplaces(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -372,7 +372,7 @@ func (s *S) TestAuthAddUserReplaces(c *C) {
 }
 
 func (s *S) TestAuthRemoveUser(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -391,7 +391,7 @@ func (s *S) TestAuthRemoveUser(c *C) {
 }
 
 func (s *S) TestAuthLoginTwiceDoesNothing(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -399,17 +399,17 @@ func (s *S) TestAuthLoginTwiceDoesNothing(c *C) {
 	err = admindb.Login("root", "rapadura")
 	c.Assert(err, IsNil)
 
-	oldStats := mgo.GetStats()
+	oldStats := GetStats()
 
 	err = admindb.Login("root", "rapadura")
 	c.Assert(err, IsNil)
 
-	newStats := mgo.GetStats()
+	newStats := GetStats()
 	c.Assert(newStats.SentOps, Equals, oldStats.SentOps)
 }
 
 func (s *S) TestAuthLoginLogoutLoginDoesNothing(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -417,18 +417,18 @@ func (s *S) TestAuthLoginLogoutLoginDoesNothing(c *C) {
 	err = admindb.Login("root", "rapadura")
 	c.Assert(err, IsNil)
 
-	oldStats := mgo.GetStats()
+	oldStats := GetStats()
 
 	admindb.Logout()
 	err = admindb.Login("root", "rapadura")
 	c.Assert(err, IsNil)
 
-	newStats := mgo.GetStats()
+	newStats := GetStats()
 	c.Assert(newStats.SentOps, Equals, oldStats.SentOps)
 }
 
 func (s *S) TestAuthLoginSwitchUser(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -455,7 +455,7 @@ func (s *S) TestAuthLoginSwitchUser(c *C) {
 }
 
 func (s *S) TestAuthLoginChangePassword(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -484,7 +484,7 @@ func (s *S) TestAuthLoginChangePassword(c *C) {
 }
 
 func (s *S) TestAuthLoginCachingWithSessionRefresh(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -500,7 +500,7 @@ func (s *S) TestAuthLoginCachingWithSessionRefresh(c *C) {
 }
 
 func (s *S) TestAuthLoginCachingWithSessionCopy(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -517,7 +517,7 @@ func (s *S) TestAuthLoginCachingWithSessionCopy(c *C) {
 }
 
 func (s *S) TestAuthLoginCachingWithSessionClone(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -534,7 +534,7 @@ func (s *S) TestAuthLoginCachingWithSessionClone(c *C) {
 }
 
 func (s *S) TestAuthLoginCachingWithNewSession(c *C) {
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -554,7 +554,7 @@ func (s *S) TestAuthLoginCachingAcrossPool(c *C) {
 	// Logins are cached even when the conenction goes back
 	// into the pool.
 
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -580,7 +580,7 @@ func (s *S) TestAuthLoginCachingAcrossPool(c *C) {
 	other := session.New()
 	defer other.Close()
 
-	oldStats := mgo.GetStats()
+	oldStats := GetStats()
 
 	err = other.DB("admin").Login("root", "rapadura")
 	c.Assert(err, IsNil)
@@ -588,7 +588,7 @@ func (s *S) TestAuthLoginCachingAcrossPool(c *C) {
 	c.Assert(err, IsNil)
 
 	// Both logins were cached, so no ops.
-	newStats := mgo.GetStats()
+	newStats := GetStats()
 	c.Assert(newStats.SentOps, Equals, oldStats.SentOps)
 
 	// And they actually worked.
@@ -605,7 +605,7 @@ func (s *S) TestAuthLoginCachingAcrossPoolWithLogout(c *C) {
 	// Now verify that logouts are properly flushed if they
 	// are not revalidated after leaving the pool.
 
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -632,13 +632,13 @@ func (s *S) TestAuthLoginCachingAcrossPoolWithLogout(c *C) {
 	other := session.New()
 	defer other.Close()
 
-	oldStats := mgo.GetStats()
+	oldStats := GetStats()
 
 	err = other.DB("mydb").Login("myuser", "mypass")
 	c.Assert(err, IsNil)
 
 	// Login was cached, so no ops.
-	newStats := mgo.GetStats()
+	newStats := GetStats()
 	c.Assert(newStats.SentOps, Equals, oldStats.SentOps)
 
 	// Can't write, since root has been implicitly logged out
@@ -656,7 +656,7 @@ func (s *S) TestAuthLoginCachingAcrossPoolWithLogout(c *C) {
 func (s *S) TestAuthEventual(c *C) {
 	// Eventual sessions don't keep sockets around, so they are
 	// an interesting test case.
-	session, err := mgo.Dial("localhost:40002")
+	session, err := Dial("localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -692,7 +692,7 @@ func (s *S) TestAuthEventual(c *C) {
 }
 
 func (s *S) TestAuthURL(c *C) {
-	session, err := mgo.Dial("mongodb://root:rapadura@localhost:40002/")
+	session, err := Dial("mongodb://root:rapadura@localhost:40002/")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -701,7 +701,7 @@ func (s *S) TestAuthURL(c *C) {
 }
 
 func (s *S) TestAuthURLWrongCredentials(c *C) {
-	session, err := mgo.Dial("mongodb://root:wrong@localhost:40002/")
+	session, err := Dial("mongodb://root:wrong@localhost:40002/")
 	if session != nil {
 		session.Close()
 	}
@@ -712,7 +712,7 @@ func (s *S) TestAuthURLWrongCredentials(c *C) {
 func (s *S) TestAuthURLWithNewSession(c *C) {
 	// When authentication is in the URL, the new session will
 	// actually carry it on as well, even if logged out explicitly.
-	session, err := mgo.Dial("mongodb://root:rapadura@localhost:40002/")
+	session, err := Dial("mongodb://root:rapadura@localhost:40002/")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -729,7 +729,7 @@ func (s *S) TestAuthURLWithNewSession(c *C) {
 }
 
 func (s *S) TestAuthURLWithDatabase(c *C) {
-	session, err := mgo.Dial("mongodb://root:rapadura@localhost:40002")
+	session, err := Dial("mongodb://root:rapadura@localhost:40002")
 	c.Assert(err, IsNil)
 	defer session.Close()
 
@@ -745,13 +745,13 @@ func (s *S) TestAuthURLWithDatabase(c *C) {
 		} else {
 			url = "mongodb://myruser:mypass@localhost:40002/admin?authSource=mydb"
 		}
-		usession, err := mgo.Dial(url)
+		usession, err := Dial(url)
 		c.Assert(err, IsNil)
 		defer usession.Close()
 
 		ucoll := usession.DB("mydb").C("mycoll")
 		err = ucoll.FindId(0).One(nil)
-		c.Assert(err, Equals, mgo.ErrNotFound)
+		c.Assert(err, Equals, ErrNotFound)
 		err = ucoll.Insert(M{"n": 1})
 		c.Assert(err, ErrorMatches, "unauthorized|not authorized .*")
 	}
@@ -767,7 +767,7 @@ func (s *S) TestDefaultDatabase(c *C) {
 	}
 
 	for _, test := range tests {
-		session, err := mgo.Dial(test.url)
+		session, err := Dial(test.url)
 		c.Assert(err, IsNil)
 		defer session.Close()
 
@@ -784,15 +784,15 @@ func (s *S) TestAuthDirect(c *C) {
 	// Direct connections must work to the master and slaves.
 	for _, port := range []string{"40031", "40032", "40033"} {
 		url := fmt.Sprintf("mongodb://root:rapadura@localhost:%s/?connect=direct", port)
-		session, err := mgo.Dial(url)
+		session, err := Dial(url)
 		c.Assert(err, IsNil)
 		defer session.Close()
 
-		session.SetMode(mgo.Monotonic, true)
+		session.SetMode(Monotonic, true)
 
 		var result struct{}
 		err = session.DB("mydb").C("mycoll").Find(nil).One(&result)
-		c.Assert(err, Equals, mgo.ErrNotFound)
+		c.Assert(err, Equals, ErrNotFound)
 	}
 }
 
@@ -800,11 +800,11 @@ func (s *S) TestAuthDirectWithLogin(c *C) {
 	// Direct connections must work to the master and slaves.
 	for _, port := range []string{"40031", "40032", "40033"} {
 		url := fmt.Sprintf("mongodb://localhost:%s/?connect=direct", port)
-		session, err := mgo.Dial(url)
+		session, err := Dial(url)
 		c.Assert(err, IsNil)
 		defer session.Close()
 
-		session.SetMode(mgo.Monotonic, true)
+		session.SetMode(Monotonic, true)
 		session.SetSyncTimeout(3 * time.Second)
 
 		err = session.DB("admin").Login("root", "rapadura")
@@ -812,7 +812,7 @@ func (s *S) TestAuthDirectWithLogin(c *C) {
 
 		var result struct{}
 		err = session.DB("mydb").C("mycoll").Find(nil).One(&result)
-		c.Assert(err, Equals, mgo.ErrNotFound)
+		c.Assert(err, Equals, ErrNotFound)
 	}
 }
 
@@ -826,12 +826,12 @@ func (s *S) TestAuthKerberosCred(c *C) {
 	if !*kerberosFlag {
 		c.Skip("no -kerberos")
 	}
-	cred := &mgo.Credential{
+	cred := &Credential{
 		Username:  kerberosUser,
 		Mechanism: "GSSAPI",
 	}
 	c.Logf("Connecting to %s...", kerberosHost)
-	session, err := mgo.Dial(kerberosHost)
+	session, err := Dial(kerberosHost)
 	defer session.Close()
 
 	c.Logf("Connected! Testing the need for authentication...")
@@ -854,7 +854,7 @@ func (s *S) TestAuthKerberosURL(c *C) {
 		c.Skip("no -kerberos")
 	}
 	c.Logf("Connecting to %s...", kerberosHost)
-	session, err := mgo.Dial(url.QueryEscape(kerberosUser) + "@" + kerberosHost + "?authMechanism=GSSAPI")
+	session, err := Dial(url.QueryEscape(kerberosUser) + "@" + kerberosHost + "?authMechanism=GSSAPI")
 	c.Assert(err, IsNil)
 	defer session.Close()
 	names, err := session.DatabaseNames()

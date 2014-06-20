@@ -24,24 +24,23 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package mgo
+package queue
 
 import (
-	"launchpad.net/gocheck"
+	"testing"
 )
 
-type QS struct{}
-
-var _ = gocheck.Suite(&QS{})
-
-func (s *QS) TestSequentialGrowth(c *gocheck.C) {
-	q := queue{}
+func TestSequentialGrowth(t *testing.T) {
+	q := Queue{}
 	n := 2048
 	for i := 0; i != n; i++ {
 		q.Push(i)
 	}
 	for i := 0; i != n; i++ {
-		c.Assert(q.Pop(), gocheck.Equals, i)
+		v := q.Pop()
+		if v != i {
+			t.Fatal("expected:", i, ", actual:", v)
+		}
 	}
 }
 
@@ -61,7 +60,7 @@ var queueTestLists = [][]int{
 		0, 1, 2, 3, 4, 5, 6, 7, 8},
 }
 
-func (s *QS) TestQueueTestLists(c *gocheck.C) {
+func TestQueueTestLists(t *testing.T) {
 	test := []int{}
 	testi := 0
 	reset := func() {
@@ -82,11 +81,14 @@ func (s *QS) TestQueueTestLists(c *gocheck.C) {
 
 	for _, list := range queueTestLists {
 		reset()
-		q := queue{}
+		q := Queue{}
 		for _, n := range list {
 			if n == -1 {
-				c.Assert(q.Pop(), gocheck.Equals, pop(),
-					gocheck.Commentf("With list %#v", list))
+				v1 := q.Pop()
+				v2 := pop()
+				if v1 != v2 {
+					t.Fatal("expected:", v1, ", actual:", v2)
+				}
 			} else {
 				q.Push(n)
 				push(n)
@@ -94,11 +96,15 @@ func (s *QS) TestQueueTestLists(c *gocheck.C) {
 		}
 
 		for n := pop(); n != -1; n = pop() {
-			c.Assert(q.Pop(), gocheck.Equals, n,
-				gocheck.Commentf("With list %#v", list))
+			v := q.Pop()
+			if v != n {
+				t.Fatal("expected:", v, ", actual:", n)
+			}
 		}
 
-		c.Assert(q.Pop(), gocheck.Equals, nil,
-			gocheck.Commentf("With list %#v", list))
+		v := q.Pop()
+		if v != nil {
+			t.Fatal("expected:", v, ", actual:", nil)
+		}
 	}
 }

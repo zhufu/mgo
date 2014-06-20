@@ -313,8 +313,12 @@ func (gfs *GridFS) OpenNext(iter *Iter, file **GridFile) bool {
 //     files := db.C("fs" + ".files")
 //     iter := files.Find(nil).Iter()
 //
+func (gfs *GridFS) find(query interface{}) *Query {
+	return gfs.Files.find(query)
+}
+
 func (gfs *GridFS) Find(query interface{}) imgo.Query {
-	return gfs.Files.Find(query)
+	return gfs.find(query)
 }
 
 // RemoveId deletes the file with the provided id from the GridFS.
@@ -333,7 +337,7 @@ type gfsDocId struct {
 
 // Remove deletes all files with the provided name from the GridFS.
 func (gfs *GridFS) Remove(name string) (err error) {
-	iter := gfs.Files.Find(bson.M{"filename": name}).Select(bson.M{"_id": 1}).Iter()
+	iter := gfs.Files.find(bson.M{"filename": name}).Select(bson.M{"_id": 1}).Iter()
 	var doc gfsDocId
 	for iter.Next(&doc) {
 		if e := gfs.RemoveId(doc.Id); e != nil {
