@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"labix.org/v2/base/bson"
 	. "labix.org/v2/base/log"
+	. "labix.org/v2/base/queue"
 	"math"
 	"net"
 	"net/url"
@@ -112,7 +113,7 @@ type Iter struct {
 	gotReply       sync.Cond
 	session        *Session
 	server         *mongoServer
-	docData        queue
+	docData        Queue
 	err            error
 	op             getMoreOp
 	prefetch       float64
@@ -1592,7 +1593,7 @@ func (s *Session) FsyncUnlock() error {
 //     http://www.mongodb.org/display/DOCS/Querying
 //     http://www.mongodb.org/display/DOCS/Advanced+Queries
 //
-func (c *Collection) Find(query interface{}) imgo.Query {
+func (c *Collection) find(query interface{}) *Query {
 	session := c.Database.Session
 	session.m.RLock()
 	q := &Query{session: session, query: session.queryConfig}
@@ -1600,6 +1601,10 @@ func (c *Collection) Find(query interface{}) imgo.Query {
 	q.op.query = query
 	q.op.collection = c.FullName
 	return q
+}
+
+func (c *Collection) Find(query interface{}) imgo.Query {
+	return c.find(query)
 }
 
 // FindId is a convenience helper equivalent to:
@@ -1950,7 +1955,7 @@ func (c *Collection) Create(info *CollectionInfo) error {
 // The default batch size is defined by the database itself.  As of this
 // writing, MongoDB will use an initial size of min(100 docs, 4MB) on the
 // first batch, and 4MB on remaining ones.
-func (q *Query) Batch(n int) imgo.Query {
+func (q *Query) Batch(n int) *Query {
 	if n == 1 {
 		// Server interprets 1 as -1 and closes the cursor (!?)
 		n = 2
@@ -1972,7 +1977,7 @@ func (q *Query) Batch(n int) imgo.Query {
 // a per-session basis as well, using the SetPrefetch method of Session.
 //
 // The default prefetch value is 0.25.
-func (q *Query) Prefetch(p float64) imgo.Query {
+func (q *Query) Prefetch(p float64) *Query {
 	q.m.Lock()
 	q.prefetch = p
 	q.m.Unlock()
@@ -1992,7 +1997,7 @@ func (q *Query) Skip(n int) imgo.Query {
 // Limit restricts the maximum number of documents retrieved to n, and also
 // changes the batch size to the same value.  Once n documents have been
 // returned by Next, the following call will return ErrNotFound.
-func (q *Query) Limit(n int) imgo.Query {
+func (q *Query) limiter(n int) *Query {
 	q.m.Lock()
 	switch {
 	case n == 1:
@@ -2012,6 +2017,10 @@ func (q *Query) Limit(n int) imgo.Query {
 	return q
 }
 
+func (q *Query) Limit(n int) imgo.Query {
+	return q.limiter(n)
+}
+
 // Select enables selecting which fields should be retrieved for the results
 // found. For example, the following query would only retrieve the name field:
 //
@@ -2021,7 +2030,7 @@ func (q *Query) Limit(n int) imgo.Query {
 //
 //     http://www.mongodb.org/display/DOCS/Retrieving+a+Subset+of+Fields
 //
-func (q *Query) Select(selector interface{}) imgo.Query {
+func (q *Query) Select(selector interface{}) *Query {
 	q.m.Lock()
 	q.op.selector = selector
 	q.m.Unlock()
@@ -2042,7 +2051,7 @@ func (q *Query) Select(selector interface{}) imgo.Query {
 //
 //     http://www.mongodb.org/display/DOCS/Sorting+and+Natural+Order
 //
-func (q *Query) Sort(fields ...string) imgo.Query {
+func (q *Query) sort(fields ...string) *Query {
 	// TODO //     query4 := collection.Find(nil).Sort("score:{$meta:textScore}")
 	q.m.Lock()
 	var order bson.D
@@ -2066,6 +2075,10 @@ func (q *Query) Sort(fields ...string) imgo.Query {
 	q.op.hasOptions = true
 	q.m.Unlock()
 	return q
+}
+
+func (q *Query) Sort(fields ...string) imgo.Query {
+	return q.sort(fields...)
 }
 
 // Explain returns a number of details about how the MongoDB server would
