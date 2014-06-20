@@ -24,11 +24,11 @@ type Collection interface {
 }
 
 type Query interface {
-	Batch(n int) Query
-	Prefetch(p float64) Query
+	//Batch(n int) Query
+	//Prefetch(p float64) Query
 	Skip(n int) Query
 	Limit(n int) Query
-	Select(selector interface{}) Query
+	//Select(selector interface{}) Query
 	Sort(fields ...string) Query
 	//Explain(result interface{}) error
 	//Hint(indexKey ...string) Query
@@ -40,7 +40,7 @@ type Query interface {
 	All(result interface{}) error
 	//For(result interface{}, f func() error) error
 	Count() (n int, err error)
-	Distinct(key string, result interface{}) error
+	//Distinct(key string, result interface{}) error
 	//MapReduce(job *MapReduce, result interface{}) (info *MapReduceInfo, err error)
 	//Apply(change Change, result interface{}) (info *ChangeInfo, err error)
 }

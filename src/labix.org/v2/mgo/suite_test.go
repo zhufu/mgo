@@ -1,4 +1,4 @@
-// mgo - MongoDB driver for Go
+// - MongoDB driver for Go
 //
 // Copyright (c) 2010-2012 - Gustavo Niemeyer <gustavo@niemeyer.net>
 //
@@ -24,15 +24,15 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package mgo_test
+package mgo
 
 import (
 	"errors"
 	"flag"
 	"fmt"
-	"labix.org/v2/mgo"
-	"labix.org/v2/mgo/bson"
-	. "labix.org/v2/mgo/log"
+	"labix.org/v2/base/bson"
+	. "labix.org/v2/base/log"
+	//"labix.org/v2/
 	. "launchpad.net/gocheck"
 	"net"
 	"os/exec"
@@ -61,9 +61,9 @@ func TestAll(t *testing.T) {
 }
 
 type S struct {
-	session *mgo.Session
+	session *Session
 	stopped bool
-	build   mgo.BuildInfo
+	build   BuildInfo
 	frozen  []string
 }
 
@@ -83,10 +83,10 @@ var _ = Suite(&S{})
 
 func (s *S) SetUpSuite(c *C) {
 	SetDebug(true)
-	mgo.SetStats(true)
+	SetStats(true)
 	s.StartAll()
 
-	session, err := mgo.Dial("localhost:40001")
+	session, err := Dial("localhost:27017")
 	c.Assert(err, IsNil)
 	s.build, err = session.BuildInfo()
 	c.Check(err, IsNil)
@@ -99,7 +99,7 @@ func (s *S) SetUpTest(c *C) {
 		panic(err.Error())
 	}
 	SetLogger((*cLogger)(c))
-	mgo.ResetStats()
+	ResetStats()
 }
 
 func (s *S) TearDownTest(c *C) {
@@ -111,9 +111,9 @@ func (s *S) TearDownTest(c *C) {
 			s.Thaw(host)
 		}
 	}
-	var stats mgo.Stats
+	var stats Stats
 	for i := 0; ; i++ {
-		stats = mgo.GetStats()
+		stats = GetStats()
 		if stats.SocketsInUse == 0 && stats.SocketsAlive == 0 {
 			break
 		}
@@ -124,7 +124,7 @@ func (s *S) TearDownTest(c *C) {
 		time.Sleep(500 * time.Millisecond)
 	}
 	for i := 0; ; i++ {
-		stats = mgo.GetStats()
+		stats = GetStats()
 		if stats.Clusters == 0 {
 			break
 		}

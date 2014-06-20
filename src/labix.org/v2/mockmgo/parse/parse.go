@@ -1,16 +1,20 @@
 package parse
 
 import (
-	"errors"
 	"reflect"
 	"strings"
 )
 
 import (
 	"labix.org/v2/base/bson"
+	. "labix.org/v2/error"
 )
 
 func Match(data, query interface{}) (match bool, err error) {
+	if query == nil {
+		return true, nil
+	}
+
 	queryFields, err := parseQuery(query)
 	if err != nil {
 		return
@@ -23,7 +27,7 @@ func Match(data, query interface{}) (match bool, err error) {
 func parseQuery(query interface{}) (queryFields QueryFields, err error) {
 	queryM, ok := query.(bson.M)
 	if !ok {
-		err = errors.New("not spt query")
+		err = UnknownQuery
 		return
 	}
 
@@ -85,7 +89,7 @@ func parseBsonM(field string, queryM bson.M, elematch bool) (queryFields QueryFi
 	return
 }
 
-func getStructValueByFlag(k string, data reflect.Value) (result reflect.Value, ok bool) {
+func GetStructValueByFlag(k string, data reflect.Value) (result reflect.Value, ok bool) {
 
 	key, left := k, ""
 	index := strings.Index(k, ".")
@@ -104,7 +108,7 @@ func getStructValueByFlag(k string, data reflect.Value) (result reflect.Value, o
 		v := data.Field(i)
 		if key == tag {
 			if left != "" {
-				return getStructValueByFlag(left, v)
+				return GetStructValueByFlag(left, v)
 			}
 			return v, true
 		}
@@ -175,7 +179,7 @@ func compareElemMatch(data reflect.Value, queryFields QueryFields) bool {
 
 func compareWithQuerys(data reflect.Value, queryFields QueryFields) bool {
 	if queryFields.Key != "" {
-		data, _ = getStructValueByFlag(queryFields.Key, data)
+		data, _ = GetStructValueByFlag(queryFields.Key, data)
 		queryFields.Key = ""
 	}
 
@@ -189,7 +193,7 @@ func compareWithQuerys(data reflect.Value, queryFields QueryFields) bool {
 
 	for _, field := range queryFields.Fields {
 		if queryField, ok := field.(QueryField); ok {
-			actualData, _ := getStructValueByFlag(queryField.Field, data)
+			actualData, _ := GetStructValueByFlag(queryField.Field, data)
 			match = compare(actualData, reflect.ValueOf(queryField.Value), queryField.Op)
 		} else if queryFields_, ok := field.(QueryFields); ok {
 			match = compareWithQuerys(data, queryFields_)
@@ -242,10 +246,8 @@ func compare(data1, data2 reflect.Value, op OP) bool {
 
 		switch data1.Kind() {
 		case reflect.Ptr, reflect.Interface:
-
 			return compare(data1.Elem(), data2.Elem(), op)
 		case reflect.Struct:
-
 			if data1.NumField() != data2.NumField() {
 				return op == NE
 			}
@@ -258,7 +260,6 @@ func compare(data1, data2 reflect.Value, op OP) bool {
 			}
 			return result
 		case reflect.Map:
-
 			result := true
 			keys := data1.MapKeys()
 			for _, key := range keys {
@@ -269,7 +270,6 @@ func compare(data1, data2 reflect.Value, op OP) bool {
 			}
 			return result
 		case reflect.Array, reflect.Slice:
-
 			if data1.Len() != data2.Len() {
 				return op == NE
 			}

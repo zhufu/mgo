@@ -24,18 +24,23 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-package mgo
+package queue
 
-type queue struct {
+import (
+	"labix.org/v2/base/bson"
+	"labix.org/v2/mockmgo/multisort"
+)
+
+type Queue struct {
 	elems               []interface{}
 	nelems, popi, pushi int
 }
 
-func (q *queue) Len() int {
+func (q *Queue) Len() int {
 	return q.nelems
 }
 
-func (q *queue) Push(elem interface{}) {
+func (q *Queue) Push(elem interface{}) {
 	//debugf("Pushing(pushi=%d popi=%d cap=%d): %#v\n",
 	//       q.pushi, q.popi, len(q.elems), elem)
 	if q.nelems == len(q.elems) {
@@ -48,7 +53,7 @@ func (q *queue) Push(elem interface{}) {
 	//       q.pushi, q.popi, len(q.elems), elem)
 }
 
-func (q *queue) Pop() (elem interface{}) {
+func (q *Queue) Pop() (elem interface{}) {
 	//debugf("Popping(pushi=%d popi=%d cap=%d)\n",
 	//       q.pushi, q.popi, len(q.elems))
 	if q.nelems == 0 {
@@ -63,7 +68,7 @@ func (q *queue) Pop() (elem interface{}) {
 	return elem
 }
 
-func (q *queue) expand() {
+func (q *Queue) expand() {
 	curcap := len(q.elems)
 	var newcap int
 	if curcap == 0 {
@@ -88,4 +93,39 @@ func (q *queue) expand() {
 		q.elems[i] = nil // Help GC.
 	}
 	q.elems = elems
+}
+
+func (q *Queue) Sort(sortBy bson.D) (err error) {
+	// sort must before filter skip, limit, so the available part is between popi -> pushi
+	q.elems, err = multisort.MultiSort(q.elems[q.popi:q.pushi], sortBy)
+	q.elems = append(q.elems, nil) // set pushi to be nil
+	return
+}
+
+func (q *Queue) Skip(n int) {
+	if n <= 0 {
+		return
+	}
+
+	if n >= q.nelems {
+		q.elems = []interface{}{}
+		q.nelems, q.popi, q.pushi = 0, 0, 0
+		return
+	}
+
+	for i := 0; i < n; i++ {
+		q.elems[q.popi] = nil
+		q.popi = (q.popi + 1) % q.nelems
+	}
+
+	q.nelems -= n
+	return
+}
+
+func (q *Queue) Limit(n int) {
+	if n <= 0 || n >= q.nelems {
+		return
+	}
+
+	q.nelems = n
 }
