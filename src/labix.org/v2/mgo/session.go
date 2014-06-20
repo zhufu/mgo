@@ -31,7 +31,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"labix.org/v2/mgo/bson"
+	"labix.org/v2/base/bson"
+	. "labix.org/v2/base/log"
 	"math"
 	"net"
 	"net/url"
@@ -435,7 +436,7 @@ func parseURL(s string) (*urlInfo, error) {
 func newSession(consistency mode, cluster *mongoCluster, timeout time.Duration) (session *Session) {
 	cluster.Acquire()
 	session = &Session{cluster_: cluster, syncTimeout: timeout, sockTimeout: timeout}
-	debugf("New session %p on cluster %p", session, cluster)
+	Debugf("New session %p on cluster %p", session, cluster)
 	session.SetMode(consistency, true)
 	session.SetSafe(&Safe{})
 	session.queryConfig.prefetch = defaultPrefetch
@@ -462,7 +463,7 @@ func copySession(session *Session, keepCreds bool) (s *Session) {
 	scopy.m = sync.RWMutex{}
 	scopy.creds = creds
 	s = &scopy
-	debugf("New session %p on cluster %p (copy from %p)", s, cluster, session)
+	Debugf("New session %p on cluster %p (copy from %p)", s, cluster, session)
 	return s
 }
 
@@ -1144,7 +1145,7 @@ func (s *Session) Clone() *Session {
 func (s *Session) Close() {
 	s.m.Lock()
 	if s.cluster_ != nil {
-		debugf("Closing session %p", s)
+		Debugf("Closing session %p", s)
 		s.unsetSocket()
 		s.cluster_.Release()
 		s.cluster_ = nil
@@ -1210,7 +1211,7 @@ func (s *Session) Refresh() {
 // connection is unsuitable (to a secondary server in a Strong session).
 func (s *Session) SetMode(consistency mode, refresh bool) {
 	s.m.Lock()
-	debugf("Session %p: setting mode %d with refresh=%v (master=%p, slave=%p)", s, consistency, refresh, s.masterSocket, s.slaveSocket)
+	Debugf("Session %p: setting mode %d with refresh=%v (master=%p, slave=%p)", s, consistency, refresh, s.masterSocket, s.slaveSocket)
 	s.consistency = consistency
 	if refresh {
 		s.slaveOk = s.consistency != Strong
@@ -2192,7 +2193,7 @@ func checkQueryError(fullname string, d []byte) error {
 Error:
 	result := &queryError{}
 	bson.Unmarshal(d, result)
-	logf("queryError: %#v\n", result)
+	Logf("queryError: %#v\n", result)
 	if result.LastError != nil {
 		return result.LastError
 	}
@@ -2247,9 +2248,9 @@ func (q *Query) One(result interface{}) (err error) {
 	if result != nil {
 		err = bson.Unmarshal(data, result)
 		if err == nil {
-			debugf("Query %p document unmarshaled: %#v", q, result)
+			Debugf("Query %p document unmarshaled: %#v", q, result)
 		} else {
-			debugf("Query %p document unmarshaling failed: %#v", q, err)
+			Debugf("Query %p document unmarshaling failed: %#v", q, err)
 			return err
 		}
 	}
@@ -2358,7 +2359,7 @@ func (s *Session) DatabaseNames() (names []string, err error) {
 // the results. Results will be returned in batches of configurable
 // size (see the Batch method) and more documents will be requested when a
 // configurable number of documents is iterated over (see the Prefetch method).
-func (q *Query) Iter() imgo.Iter {
+func (q *Query) iter() *Iter {
 	q.m.Lock()
 	session := q.session
 	op := q.op
@@ -2395,6 +2396,10 @@ func (q *Query) Iter() imgo.Iter {
 		socket.Release()
 	}
 	return iter
+}
+
+func (q *Query) Iter() imgo.Iter {
+	return q.iter()
 }
 
 // Tail returns a tailable iterator. Unlike a normal iterator, a
@@ -2625,7 +2630,7 @@ func (iter *Iter) Next(result interface{}) bool {
 		iter.m.Unlock()
 		err := bson.Unmarshal(docData, result)
 		if err != nil {
-			debugf("Iter %p document unmarshaling failed: %#v", iter, err)
+			Debugf("Iter %p document unmarshaling failed: %#v", iter, err)
 			iter.m.Lock()
 			if iter.err == nil {
 				iter.err = err
@@ -2633,7 +2638,7 @@ func (iter *Iter) Next(result interface{}) bool {
 			iter.m.Unlock()
 			return false
 		}
-		debugf("Iter %p document unmarshaled: %#v", iter, result)
+		Debugf("Iter %p document unmarshaled: %#v", iter, result)
 		// XXX Only have to check first document for a query error?
 		err = checkQueryError(iter.op.collection, docData)
 		if err != nil {
@@ -2646,12 +2651,12 @@ func (iter *Iter) Next(result interface{}) bool {
 		}
 		return true
 	} else if iter.err != nil {
-		debugf("Iter %p returning false: %s", iter, iter.err)
+		Debugf("Iter %p returning false: %s", iter, iter.err)
 		iter.m.Unlock()
 		return false
 	} else if iter.op.cursorId == 0 {
 		iter.err = ErrNotFound
-		debugf("Iter %p exhausted with cursor=0", iter)
+		Debugf("Iter %p exhausted with cursor=0", iter)
 		iter.m.Unlock()
 		return false
 	}
@@ -2715,7 +2720,7 @@ func (q *Query) All(result interface{}) error {
 // The For method is obsolete and will be removed in a future release.
 // See Iter as an elegant replacement.
 func (q *Query) For(result interface{}, f func() error) error {
-	return q.Iter().For(result, f)
+	return q.iter().For(result, f)
 }
 
 // The For method is obsolete and will be removed in a future release.
@@ -2782,7 +2787,7 @@ func (iter *Iter) getMore() {
 	}
 	defer socket.Release()
 
-	debugf("Iter %p requesting more documents", iter)
+	Debugf("Iter %p requesting more documents", iter)
 	if iter.limit > 0 {
 		limit := iter.limit - int32(iter.docsToReceive) - int32(iter.docData.Len())
 		if limit < iter.op.limit {
@@ -3317,9 +3322,9 @@ func (iter *Iter) replyFunc() replyFunc {
 		iter.docsToReceive--
 		if err != nil {
 			iter.err = err
-			debugf("Iter %p received an error: %s", iter, err.Error())
+			Debugf("Iter %p received an error: %s", iter, err.Error())
 		} else if docNum == -1 {
-			debugf("Iter %p received no documents (cursor=%d).", iter, op.cursorId)
+			Debugf("Iter %p received no documents (cursor=%d).", iter, op.cursorId)
 			if op != nil && op.cursorId != 0 {
 				// It's a tailable cursor.
 				iter.op.cursorId = op.cursorId
@@ -3339,7 +3344,7 @@ func (iter *Iter) replyFunc() replyFunc {
 				iter.op.cursorId = op.cursorId
 			}
 			// XXX Handle errors and flags.
-			debugf("Iter %p received reply document %d/%d (cursor=%d)", iter, docNum+1, rdocs, op.cursorId)
+			Debugf("Iter %p received reply document %d/%d (cursor=%d)", iter, docNum+1, rdocs, op.cursorId)
 			iter.docData.Push(docData)
 		}
 		iter.gotReply.Broadcast()
@@ -3395,7 +3400,7 @@ func (c *Collection) writeQuery(op interface{}) (lerr *LastError, err error) {
 		}
 		result := &LastError{}
 		bson.Unmarshal(replyData, &result)
-		debugf("Result from writing query: %#v", result)
+		Debugf("Result from writing query: %#v", result)
 		if result.Err != "" {
 			return result, result
 		}

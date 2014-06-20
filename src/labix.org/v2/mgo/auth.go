@@ -31,7 +31,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"labix.org/v2/mgo/bson"
+	"labix.org/v2/base/bson"
+	. "labix.org/v2/base/log"
 	"sync"
 )
 
@@ -92,14 +93,14 @@ type saslStepper interface {
 func (socket *mongoSocket) getNonce() (nonce string, err error) {
 	socket.Lock()
 	for socket.cachedNonce == "" && socket.dead == nil {
-		debugf("Socket %p to %s: waiting for nonce", socket, socket.addr)
+		Debugf("Socket %p to %s: waiting for nonce", socket, socket.addr)
 		socket.gotNonce.Wait()
 	}
 	if socket.cachedNonce == "mongos" {
 		socket.Unlock()
 		return "", errors.New("Can't authenticate with mongos; see http://j.mp/mongos-auth")
 	}
-	debugf("Socket %p to %s: got nonce", socket, socket.addr)
+	Debugf("Socket %p to %s: got nonce", socket, socket.addr)
 	nonce, err = socket.cachedNonce, socket.dead
 	socket.cachedNonce = ""
 	socket.Unlock()
@@ -110,7 +111,7 @@ func (socket *mongoSocket) getNonce() (nonce string, err error) {
 }
 
 func (socket *mongoSocket) resetNonce() {
-	debugf("Socket %p to %s: requesting a new nonce", socket, socket.addr)
+	Debugf("Socket %p to %s: requesting a new nonce", socket, socket.addr)
 	op := &queryOp{}
 	op.query = &getNonceCmd{GetNonce: 1}
 	op.collection = "admin.$cmd"
@@ -126,7 +127,7 @@ func (socket *mongoSocket) resetNonce() {
 			socket.kill(errors.New("Failed to unmarshal nonce: "+err.Error()), true)
 			return
 		}
-		debugf("Socket %p to %s: nonce unmarshalled: %#v", socket, socket.addr, result)
+		Debugf("Socket %p to %s: nonce unmarshalled: %#v", socket, socket.addr, result)
 		if result.Code == 13390 {
 			// mongos doesn't yet support auth (see http://j.mp/mongos-auth)
 			result.Nonce = "mongos"
@@ -159,20 +160,20 @@ func (socket *mongoSocket) Login(cred Credential) error {
 	socket.Lock()
 	for _, sockCred := range socket.creds {
 		if sockCred == cred {
-			debugf("Socket %p to %s: login: db=%q user=%q (already logged in)", socket, socket.addr, cred.Source, cred.Username)
+			Debugf("Socket %p to %s: login: db=%q user=%q (already logged in)", socket, socket.addr, cred.Source, cred.Username)
 			socket.Unlock()
 			return nil
 		}
 	}
 	if socket.dropLogout(cred) {
-		debugf("Socket %p to %s: login: db=%q user=%q (cached)", socket, socket.addr, cred.Source, cred.Username)
+		Debugf("Socket %p to %s: login: db=%q user=%q (cached)", socket, socket.addr, cred.Source, cred.Username)
 		socket.creds = append(socket.creds, cred)
 		socket.Unlock()
 		return nil
 	}
 	socket.Unlock()
 
-	debugf("Socket %p to %s: login: db=%q user=%q", socket, socket.addr, cred.Source, cred.Username)
+	Debugf("Socket %p to %s: login: db=%q user=%q", socket, socket.addr, cred.Source, cred.Username)
 
 	var err error
 	switch cred.Mechanism {
@@ -186,9 +187,9 @@ func (socket *mongoSocket) Login(cred Credential) error {
 	}
 
 	if err != nil {
-		debugf("Socket %p to %s: login error: %s", socket, socket.addr, err)
+		Debugf("Socket %p to %s: login error: %s", socket, socket.addr, err)
 	} else {
-		debugf("Socket %p to %s: login successful", socket, socket.addr)
+		Debugf("Socket %p to %s: login successful", socket, socket.addr)
 	}
 	return err
 }
@@ -339,7 +340,7 @@ func (socket *mongoSocket) Logout(db string) {
 	socket.Lock()
 	cred, found := socket.dropAuth(db)
 	if found {
-		debugf("Socket %p to %s: logout: db=%q (flagged)", socket, socket.addr, db)
+		Debugf("Socket %p to %s: logout: db=%q (flagged)", socket, socket.addr, db)
 		socket.logout = append(socket.logout, cred)
 	}
 	socket.Unlock()
@@ -348,7 +349,7 @@ func (socket *mongoSocket) Logout(db string) {
 func (socket *mongoSocket) LogoutAll() {
 	socket.Lock()
 	if l := len(socket.creds); l > 0 {
-		debugf("Socket %p to %s: logout all (flagged %d)", socket, socket.addr, l)
+		Debugf("Socket %p to %s: logout all (flagged %d)", socket, socket.addr, l)
 		socket.logout = append(socket.logout, socket.creds...)
 		socket.creds = socket.creds[0:0]
 	}
@@ -358,7 +359,7 @@ func (socket *mongoSocket) LogoutAll() {
 func (socket *mongoSocket) flushLogout() (ops []interface{}) {
 	socket.Lock()
 	if l := len(socket.logout); l > 0 {
-		debugf("Socket %p to %s: logout all (flushing %d)", socket, socket.addr, l)
+		Debugf("Socket %p to %s: logout all (flushing %d)", socket, socket.addr, l)
 		for i := 0; i != l; i++ {
 			op := queryOp{}
 			op.query = &logoutCmd{1}

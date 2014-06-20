@@ -28,7 +28,8 @@ package mgo
 
 import (
 	"errors"
-	"labix.org/v2/mgo/bson"
+	"labix.org/v2/base/bson"
+	. "labix.org/v2/base/log"
 	"net"
 	"sync"
 	"time"
@@ -77,7 +78,7 @@ func newCluster(userSeeds []string, direct, failFast bool, dial dialer) *mongoCl
 func (cluster *mongoCluster) Acquire() {
 	cluster.Lock()
 	cluster.references++
-	debugf("Cluster %p acquired (refs=%d)", cluster, cluster.references)
+	Debugf("Cluster %p acquired (refs=%d)", cluster, cluster.references)
 	cluster.Unlock()
 }
 
@@ -89,7 +90,7 @@ func (cluster *mongoCluster) Release() {
 		panic("cluster.Release() with references == 0")
 	}
 	cluster.references--
-	debugf("Cluster %p released (refs=%d)", cluster, cluster.references)
+	Debugf("Cluster %p released (refs=%d)", cluster, cluster.references)
 	if cluster.references == 0 {
 		for _, server := range cluster.servers.Slice() {
 			server.Close()
@@ -117,7 +118,7 @@ func (cluster *mongoCluster) removeServer(server *mongoServer) {
 	cluster.Unlock()
 	if other != nil {
 		other.Close()
-		log("Removed server ", server.Addr, " from cluster.")
+		Log("Removed server ", server.Addr, " from cluster.")
 	}
 	server.Close()
 }
@@ -149,7 +150,7 @@ var syncSocketTimeout = 5 * time.Second
 
 func (cluster *mongoCluster) syncServer(server *mongoServer) (info *mongoServerInfo, hosts []string, err error) {
 	addr := server.Addr
-	log("SYNC Processing ", addr, "...")
+	Log("SYNC Processing ", addr, "...")
 
 	// Retry a few times to avoid knocking a server down for a hiccup.
 	var result isMasterResult
@@ -172,31 +173,31 @@ func (cluster *mongoCluster) syncServer(server *mongoServer) (info *mongoServerI
 		socket, _, err := server.AcquireSocket(0, syncSocketTimeout)
 		if err != nil {
 			tryerr = err
-			logf("SYNC Failed to get socket to %s: %v", addr, err)
+			Logf("SYNC Failed to get socket to %s: %v", addr, err)
 			continue
 		}
 		err = cluster.isMaster(socket, &result)
 		socket.Release()
 		if err != nil {
 			tryerr = err
-			logf("SYNC Command 'ismaster' to %s failed: %v", addr, err)
+			Logf("SYNC Command 'ismaster' to %s failed: %v", addr, err)
 			continue
 		}
-		debugf("SYNC Result of 'ismaster' from %s: %#v", addr, result)
+		Debugf("SYNC Result of 'ismaster' from %s: %#v", addr, result)
 		break
 	}
 
 	if result.IsMaster {
-		debugf("SYNC %s is a master.", addr)
+		Debugf("SYNC %s is a master.", addr)
 		// Made an incorrect assumption above, so fix stats.
 		stats.conn(-1, false)
 		stats.conn(+1, true)
 	} else if result.Secondary {
-		debugf("SYNC %s is a slave.", addr)
+		Debugf("SYNC %s is a slave.", addr)
 	} else if cluster.direct {
-		logf("SYNC %s in unknown state. Pretending it's a slave due to direct connection.", addr)
+		Logf("SYNC %s in unknown state. Pretending it's a slave due to direct connection.", addr)
 	} else {
-		logf("SYNC %s is neither a master nor a slave.", addr)
+		Logf("SYNC %s is neither a master nor a slave.", addr)
 		// Made an incorrect assumption above, so fix stats.
 		stats.conn(-1, false)
 		return nil, nil, errors.New(addr + " is not a master nor slave")
@@ -216,7 +217,7 @@ func (cluster *mongoCluster) syncServer(server *mongoServer) (info *mongoServerI
 	hosts = append(hosts, result.Hosts...)
 	hosts = append(hosts, result.Passives...)
 
-	debugf("SYNC %s knows about the following peers: %#v", addr, hosts)
+	Debugf("SYNC %s knows about the following peers: %#v", addr, hosts)
 	return info, hosts, nil
 }
 
@@ -234,15 +235,15 @@ func (cluster *mongoCluster) addServer(server *mongoServer, info *mongoServerInf
 		if syncKind == partialSync {
 			cluster.Unlock()
 			server.Close()
-			log("SYNC Discarding unknown server ", server.Addr, " due to partial sync.")
+			Log("SYNC Discarding unknown server ", server.Addr, " due to partial sync.")
 			return
 		}
 		cluster.servers.Add(server)
 		if info.Master {
 			cluster.masters.Add(server)
-			log("SYNC Adding ", server.Addr, " to cluster as a master.")
+			Log("SYNC Adding ", server.Addr, " to cluster as a master.")
 		} else {
-			log("SYNC Adding ", server.Addr, " to cluster as a slave.")
+			Log("SYNC Adding ", server.Addr, " to cluster as a slave.")
 		}
 	} else {
 		if server != current {
@@ -250,16 +251,16 @@ func (cluster *mongoCluster) addServer(server *mongoServer, info *mongoServerInf
 		}
 		if server.Info().Master != info.Master {
 			if info.Master {
-				log("SYNC Server ", server.Addr, " is now a master.")
+				Log("SYNC Server ", server.Addr, " is now a master.")
 				cluster.masters.Add(server)
 			} else {
-				log("SYNC Server ", server.Addr, " is now a slave.")
+				Log("SYNC Server ", server.Addr, " is now a slave.")
 				cluster.masters.Remove(server)
 			}
 		}
 	}
 	server.SetInfo(info)
-	debugf("SYNC Broadcasting availability of server %s", server.Addr)
+	Debugf("SYNC Broadcasting availability of server %s", server.Addr)
 	cluster.serverSynced.Broadcast()
 	cluster.Unlock()
 }
@@ -315,7 +316,7 @@ const syncShortDelay = 500 * time.Millisecond
 // retrieved.
 func (cluster *mongoCluster) syncServersLoop() {
 	for {
-		debugf("SYNC Cluster %p is starting a sync loop iteration.", cluster)
+		Debugf("SYNC Cluster %p is starting a sync loop iteration.", cluster)
 
 		cluster.Lock()
 		if cluster.references == 0 {
@@ -356,12 +357,12 @@ func (cluster *mongoCluster) syncServersLoop() {
 		cluster.Unlock()
 
 		if restart {
-			log("SYNC No masters found. Will synchronize again.")
+			Log("SYNC No masters found. Will synchronize again.")
 			time.Sleep(syncShortDelay)
 			continue
 		}
 
-		debugf("SYNC Cluster %p waiting for next requested or scheduled sync.", cluster)
+		Debugf("SYNC Cluster %p waiting for next requested or scheduled sync.", cluster)
 
 		// Hold off until somebody explicitly requests a synchronization
 		// or it's time to check for a cluster topology change again.
@@ -370,7 +371,7 @@ func (cluster *mongoCluster) syncServersLoop() {
 		case <-time.After(syncServersDelay):
 		}
 	}
-	debugf("SYNC Cluster %p is stopping its sync loop.", cluster)
+	Debugf("SYNC Cluster %p is stopping its sync loop.", cluster)
 }
 
 func (cluster *mongoCluster) server(addr string, tcpaddr *net.TCPAddr) *mongoServer {
@@ -386,11 +387,11 @@ func (cluster *mongoCluster) server(addr string, tcpaddr *net.TCPAddr) *mongoSer
 func resolveAddr(addr string) (*net.TCPAddr, error) {
 	tcpaddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
-		log("SYNC Failed to resolve ", addr, ": ", err.Error())
+		Log("SYNC Failed to resolve ", addr, ": ", err.Error())
 		return nil, err
 	}
 	if tcpaddr.String() != addr {
-		debug("SYNC Address ", addr, " resolved as ", tcpaddr.String())
+		Debug("SYNC Address ", addr, " resolved as ", tcpaddr.String())
 	}
 	return tcpaddr, nil
 }
@@ -401,7 +402,7 @@ type pendingAdd struct {
 }
 
 func (cluster *mongoCluster) syncServersIteration(direct bool) {
-	log("SYNC Starting full topology synchronization...")
+	Log("SYNC Starting full topology synchronization...")
 
 	var wg sync.WaitGroup
 	var m sync.Mutex
@@ -418,7 +419,7 @@ func (cluster *mongoCluster) syncServersIteration(direct bool) {
 
 			tcpaddr, err := resolveAddr(addr)
 			if err != nil {
-				log("SYNC Failed to start sync of ", addr, ": ", err.Error())
+				Log("SYNC Failed to start sync of ", addr, ": ", err.Error())
 				return
 			}
 			resolvedAddr := tcpaddr.String()
@@ -473,12 +474,12 @@ func (cluster *mongoCluster) syncServersIteration(direct bool) {
 	wg.Wait()
 
 	if syncKind == completeSync {
-		logf("SYNC Synchronization was complete (got data from primary).")
+		Logf("SYNC Synchronization was complete (got data from primary).")
 		for _, pending := range notYetAdded {
 			cluster.removeServer(pending.server)
 		}
 	} else {
-		logf("SYNC Synchronization was partial (cannot talk to primary).")
+		Logf("SYNC Synchronization was partial (cannot talk to primary).")
 		for _, pending := range notYetAdded {
 			cluster.addServer(pending.server, pending.info, partialSync)
 		}
@@ -486,7 +487,7 @@ func (cluster *mongoCluster) syncServersIteration(direct bool) {
 
 	cluster.Lock()
 	ml := cluster.masters.Len()
-	logf("SYNC Synchronization completed: %d master(s) and %d slave(s) alive.", ml, cluster.servers.Len()-ml)
+	Logf("SYNC Synchronization completed: %d master(s) and %d slave(s) alive.", ml, cluster.servers.Len()-ml)
 
 	// Update dynamic seeds, but only if we have any good servers. Otherwise,
 	// leave them alone for better chances of a successful sync in the future.
@@ -496,7 +497,7 @@ func (cluster *mongoCluster) syncServersIteration(direct bool) {
 			dynaSeeds[i] = server.Addr
 		}
 		cluster.dynaSeeds = dynaSeeds
-		debugf("SYNC New dynamic seeds: %#v\n", dynaSeeds)
+		Debugf("SYNC New dynamic seeds: %#v\n", dynaSeeds)
 	}
 	cluster.Unlock()
 }
@@ -515,7 +516,7 @@ func (cluster *mongoCluster) AcquireSocket(slaveOk bool, syncTimeout time.Durati
 		for {
 			ml := cluster.masters.Len()
 			sl := cluster.servers.Len()
-			debugf("Cluster has %d known masters and %d known slaves.", ml, sl-ml)
+			Debugf("Cluster has %d known masters and %d known slaves.", ml, sl-ml)
 			if ml > 0 || slaveOk && sl > 0 {
 				break
 			}
@@ -527,7 +528,7 @@ func (cluster *mongoCluster) AcquireSocket(slaveOk bool, syncTimeout time.Durati
 				cluster.RUnlock()
 				return nil, errors.New("no reachable servers")
 			}
-			log("Waiting for servers to synchronize...")
+			Log("Waiting for servers to synchronize...")
 			cluster.syncServers()
 
 			// Remember: this will release and reacquire the lock.
@@ -551,7 +552,7 @@ func (cluster *mongoCluster) AcquireSocket(slaveOk bool, syncTimeout time.Durati
 		s, abended, err := server.AcquireSocket(socketsPerServer, socketTimeout)
 		if err == errSocketLimit {
 			if !warnedLimit {
-				log("WARNING: Per-server connection limit reached.")
+				Log("WARNING: Per-server connection limit reached.")
 			}
 			time.Sleep(1e8)
 			continue
@@ -565,7 +566,7 @@ func (cluster *mongoCluster) AcquireSocket(slaveOk bool, syncTimeout time.Durati
 			var result isMasterResult
 			err := cluster.isMaster(s, &result)
 			if err != nil || !result.IsMaster {
-				logf("Cannot confirm server %s as master (%v)", server.Addr, err)
+				Logf("Cannot confirm server %s as master (%v)", server.Addr, err)
 				s.Release()
 				cluster.syncServers()
 				time.Sleep(1e8)
